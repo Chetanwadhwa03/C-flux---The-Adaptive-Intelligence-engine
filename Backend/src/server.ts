@@ -1,0 +1,187 @@
+import express from 'express'
+import { createServer } from 'http'
+import bcrypt from 'bcrypt'
+import Usermodel from './Models/User.js';
+import { z } from 'zod';
+import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+import Auth from './Middleware/Auth.js';
+import Chatmodel from './Models/Chat.js';
+
+
+dotenv.config()
+
+const app = express()
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000
+const server = createServer(app);
+
+app.use(express.json());
+
+const zodschema = z.object({
+    username: z.string().max(10, 'Max length of the username can be 10 only'),
+    email: z.email(),
+    password: z.string().max(10, 'Max length of the password can be 10 only').regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\w!@#$%^&*]{8,}$/)
+})
+
+type zodtype = z.infer<typeof zodschema>
+
+app.post('api/v1/signup', async (req, res) => {
+    try {
+        const { username, email, password }: zodtype = req.body
+
+        if (!email || !username || !password) {
+            return res.status(400).json({
+                message: 'Please enter all the credentials'
+            })
+        }
+
+        const result = zodschema.safeParse(req.body);
+
+        if (result.success) {
+            const hashedpassword = await bcrypt.hash(password, 12);
+            await Usermodel.create({
+                username: username,
+                email: email,
+                password: hashedpassword
+            })
+
+            res.status(200).json({
+                message: 'Signup Successful !!!'
+            })
+        }
+        else {
+            console.log('Validation failed for the user credentials');
+            return res.status(400).json({
+                message: result.data
+            })
+        }
+    }
+    catch (e) {
+        console.log('Error encountered in signup as ', e);
+        res.status(500).json({
+            message: 'Internal Server Error'
+        })
+    }
+})
+
+app.post('/api/v1/signin', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({
+                message: 'Please enter all the credentials'
+            })
+        }
+
+        const curruser = await Usermodel.findOne({
+            email: email
+        })
+
+        if (!curruser) {
+            return res.status(400).json({
+                message: 'Please signup first'
+            })
+        }
+
+        const hashedpassword = curruser.password;
+
+        // @ts-ignore
+        const result = bcrypt.compare(password, hashedpassword);
+
+        if (!result) {
+            return res.status(403).json({
+                message: 'Password is incorrect !!'
+            })
+        }
+
+        // @ts-ignore
+        const JWT_SECRET_KEY: string = process.env.JWT_SECRET_KEY
+        const token = jwt.sign({
+            email
+        }, JWT_SECRET_KEY);
+
+        res.status(200).json({
+            message: 'Signin Successful, Welcome to C-Flux!'
+        })
+    }
+    catch (e) {
+        console.log('Error encountered in signin as ', e);
+        res.status(500).json({
+            message: 'Internal Server error'
+        })
+    }
+
+})
+
+app.post('api/v1/newchat', Auth, async (req, res) => {
+    try {
+        const email = res.locals.email
+        const { chatname, model } = req.body
+
+        const curruser = await Usermodel.findOne({
+            email: email
+        })
+
+        if (!curruser) {
+            return res.status(400).json({
+                message: 'Something went wrong! please signup again'
+            })
+        }
+
+        const userid = curruser._id;
+
+        await Chatmodel.create({
+            userid: userid,
+            chatname: chatname,
+            model: model
+        })
+
+        res.status(200).json({
+            message: 'Chat Created successfully !!'
+        })
+    }
+    catch (e) {
+        console.log('Error encountered while making the newchat as ', e);
+        res.status(500).json({
+            message: 'Internal Server Error'
+        })
+    }
+})
+
+app.get('api/v1/get-chat', Auth, async (req, res) => {
+    try {
+        const email = res.locals.email;
+        const curruser = await Usermodel.findOne({
+            email: email
+        })
+
+        if (!curruser) {
+            return res.status(400).json({
+                message: 'Something went wrong, please Signup again !!!'
+            })
+        }
+
+        const userid = curruser._id
+
+        const curruserchats = await Chatmodel.find({
+            userid: userid
+        })
+
+        // Here i have just sent the curruserchats even though it's size is 0, because i have left it over the frontend to handle it , if the size is 0 then it will show newchat or createchat option and if it isn't then it will show the present chats from this array.
+
+        return res.status(200).json({
+            curruserchats: curruserchats
+        })
+    }
+    catch (e) {
+        console.log('Error encountered while fetching the chat for the side bar as ', e);
+        return res.status(500).json({
+            message:'Internal Server Error'
+        })
+    }
+})
+
+
+server.listen(PORT, () => {
+    console.log(`Server is listening on the ${PORT}`);
+})
