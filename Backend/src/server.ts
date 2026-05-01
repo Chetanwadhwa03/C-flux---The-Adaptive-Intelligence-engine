@@ -5,9 +5,11 @@ import Usermodel from './Models/User.js';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+
 import Auth from './Middleware/Auth.js';
 import Chatmodel from './Models/Chat.js';
 import Messagemodel from './Models/Message.js';
+import Redisclient from './config/Redisclient.js';
 
 
 dotenv.config()
@@ -99,12 +101,12 @@ app.post('/api/v1/signin', async (req, res) => {
         // @ts-ignore
         const JWT_SECRET_KEY: string = process.env.JWT_SECRET_KEY
         const token = jwt.sign({
-            email,userid
+            email, userid
         }, JWT_SECRET_KEY);
 
         res.status(200).json({
             message: 'Signin Successful, Welcome to C-Flux!',
-            token:token
+            token: token
         })
     }
     catch (e) {
@@ -177,13 +179,13 @@ app.get('/api/v1/get-chat/:chatid/messages', Auth, async (req, res) => {
     try {
         const chatid = JSON.stringify(req.params.chatid)
 
-        let page = 1; 
-        if(typeof req.query.p === 'string'){
-             page = parseInt(req.query.p) || 1;
+        let page = 1;
+        if (typeof req.query.p === 'string') {
+            page = parseInt(req.query.p) || 1;
         }
 
         let limit = 50;
-        if(typeof req.query.limit === 'string'){
+        if (typeof req.query.limit === 'string') {
             limit = parseInt(req.query.limit) || 50;
         }
 
@@ -212,13 +214,58 @@ app.get('/api/v1/get-chat/:chatid/messages', Auth, async (req, res) => {
     catch (e) {
         console.log(`Error encountered while fetching the messages for the ${req.params.chatid}`);
         res.status(500).json({
-            message:'Internal Server Error'
+            message: 'Internal Server Error'
         })
     }
 
 })
 
+app.post('/api/v1/post-chat/:chatid/messages', async (req, res) => {
+    try {
+        const { chatid } = req.params
+        const { content } = req.body
 
-server.listen(PORT, () => {
-    console.log(`Server is listening on the ${PORT}`);
+        const messagegot = {
+            chatid: chatid,
+            chattype: 'user',
+            content: content
+        }
+
+        // @ts-ignore
+        await Messagemodel.create(messagegot)
+
+        await Redisclient.lPush('AI_handling_messages', JSON.stringify(messagegot));
+        console.log('Message pushed to the redis queue');
+
+        res.status(200).json({
+            message: 'Processing!!!'
+        })
+
+    }
+    catch (e) {
+        console.log('Error encountered in the postmessage API as ', e);
+        res.status(500).json({
+            message:'Internal Server Error'
+        })
+    }
 })
+
+
+
+const connect = async () => {
+    try {
+        await Redisclient.connect();
+        console.log('Redis client connected!');
+
+        server.listen(PORT, () => {
+            console.log(`Server is listening on the ${PORT}`);
+        })
+
+    }
+    catch (e) {
+        console.log('Error during connection either to redis or server as ', e);
+    }
+}
+connect();
+
+
