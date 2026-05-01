@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
 import Auth from './Middleware/Auth.js';
 import Chatmodel from './Models/Chat.js';
+import Messagemodel from './Models/Message.js';
 
 
 dotenv.config()
@@ -25,7 +26,7 @@ const zodschema = z.object({
 
 type zodtype = z.infer<typeof zodschema>
 
-app.post('api/v1/signup', async (req, res) => {
+app.post('/api/v1/signup', async (req, res) => {
     try {
         const { username, email, password }: zodtype = req.body
 
@@ -84,6 +85,7 @@ app.post('/api/v1/signin', async (req, res) => {
         }
 
         const hashedpassword = curruser.password;
+        const userid = curruser._id;
 
         // @ts-ignore
         const result = bcrypt.compare(password, hashedpassword);
@@ -97,11 +99,12 @@ app.post('/api/v1/signin', async (req, res) => {
         // @ts-ignore
         const JWT_SECRET_KEY: string = process.env.JWT_SECRET_KEY
         const token = jwt.sign({
-            email
+            email,userid
         }, JWT_SECRET_KEY);
 
         res.status(200).json({
-            message: 'Signin Successful, Welcome to C-Flux!'
+            message: 'Signin Successful, Welcome to C-Flux!',
+            token:token
         })
     }
     catch (e) {
@@ -113,7 +116,7 @@ app.post('/api/v1/signin', async (req, res) => {
 
 })
 
-app.post('api/v1/newchat', Auth, async (req, res) => {
+app.post('/api/v1/newchat', Auth, async (req, res) => {
     try {
         const email = res.locals.email
         const { chatname, model } = req.body
@@ -148,20 +151,9 @@ app.post('api/v1/newchat', Auth, async (req, res) => {
     }
 })
 
-app.get('api/v1/get-chat', Auth, async (req, res) => {
+app.get('/api/v1/get-chat', Auth, async (req, res) => {
     try {
-        const email = res.locals.email;
-        const curruser = await Usermodel.findOne({
-            email: email
-        })
-
-        if (!curruser) {
-            return res.status(400).json({
-                message: 'Something went wrong, please Signup again !!!'
-            })
-        }
-
-        const userid = curruser._id
+        const userid = res.locals.userid;
 
         const curruserchats = await Chatmodel.find({
             userid: userid
@@ -176,9 +168,54 @@ app.get('api/v1/get-chat', Auth, async (req, res) => {
     catch (e) {
         console.log('Error encountered while fetching the chat for the side bar as ', e);
         return res.status(500).json({
+            message: 'Internal Server Error'
+        })
+    }
+})
+
+app.get('/api/v1/get-chat/:chatid/messages', Auth, async (req, res) => {
+    try {
+        const chatid = JSON.stringify(req.params.chatid)
+
+        let page = 1; 
+        if(typeof req.query.p === 'string'){
+             page = parseInt(req.query.p) || 1;
+        }
+
+        let limit = 50;
+        if(typeof req.query.limit === 'string'){
+            limit = parseInt(req.query.limit) || 50;
+        }
+
+        const skip = (page - 1) * limit;
+
+        const currchat = await Messagemodel.find({
+            chatid: chatid
+        }).sort({ createdAt: -1 }).skip(skip).limit(limit);
+
+        const totalmessagesinchat = await Messagemodel.countDocuments({
+            chatid: chatid
+        })
+
+        const totalpages = Math.ceil(totalmessagesinchat / limit)
+
+
+        res.status(200).json({
+            currchatmessages: currchat,
+            pagination: {
+                currentpage: page,
+                totalpages: totalpages,
+                hasmore: page < totalpages
+            }
+        })
+    }
+    catch (e) {
+        console.log(`Error encountered while fetching the messages for the ${req.params.chatid}`);
+        res.status(500).json({
             message:'Internal Server Error'
         })
     }
+
 })
 
 

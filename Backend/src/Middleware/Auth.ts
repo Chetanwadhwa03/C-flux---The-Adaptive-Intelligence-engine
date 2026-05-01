@@ -18,7 +18,8 @@ const Auth = async (req: Request, res: Response, next: NextFunction) => {
 
         // @ts-ignore
         const data = jwt.verify(token, JWT_SECRET_KEY);
-        res.locals.email = data.email ;
+        res.locals.email = data.email;
+        res.locals.userid = data.userid;
         next();
     }
     catch(e){
