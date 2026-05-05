@@ -5,11 +5,16 @@ import Usermodel from './Models/User.js';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import mongoose from 'mongoose';
+import upload from './Middleware/Multer.js';
+import uploadbuffertocloudinary from './config/Cloudinary.js';
+
 
 import Auth from './Middleware/Auth.js';
 import Chatmodel from './Models/Chat.js';
 import Messagemodel from './Models/Message.js';
 import Redisclient from './config/Redisclient.js';
+
 
 
 dotenv.config()
@@ -177,7 +182,20 @@ app.get('/api/v1/get-chat', Auth, async (req, res) => {
 
 app.get('/api/v1/get-chat/:chatid/messages', Auth, async (req, res) => {
     try {
-        const chatid = JSON.stringify(req.params.chatid)
+        const chatid = req.params.chatid
+
+        if (typeof chatid !== 'string') {
+            return res.status(400).json({
+                message: 'Chatid should be a single string'
+            })
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(chatid)) {
+            return res.status(400).json({
+                message: 'Chatid is invalid'
+            })
+        }
+
 
         let page = 1;
         if (typeof req.query.p === 'string') {
@@ -245,8 +263,40 @@ app.post('/api/v1/post-chat/:chatid/messages', async (req, res) => {
     catch (e) {
         console.log('Error encountered in the postmessage API as ', e);
         res.status(500).json({
+            message: 'Internal Server Error'
+        })
+    }
+})
+
+app.post('/api/v1/:chatid/upload-files', Auth, upload.single('pdffile'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                message: 'Please upload the file !'
+            })
+        }
+        const pdffilebuffer = req.file.buffer
+        const {chatid} = req.params
+
+        const uploadfilelink = await uploadbuffertocloudinary(pdffilebuffer)
+
+        const ingestionobj = {
+            type: 'ingestion',
+            link: uploadfilelink,
+            chatid: chatid
+        }
+
+        await Redisclient.lPush('AI_handling_messages', JSON.stringify(ingestionobj));
+
+        res.status(200).json({
+            message: 'File uploaded, loading in the background'
+        })
+    }
+    catch (e) {
+        res.status(500).json({
             message:'Internal Server Error'
         })
+        console.log('Error encountered while uploading the file as : ',e)
     }
 })
 
