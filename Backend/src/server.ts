@@ -244,6 +244,7 @@ app.post('/api/v1/post-chat/:chatid/messages', async (req, res) => {
         const { content } = req.body
 
         const messagegot = {
+            type:'messageprocess',
             chatid: chatid,
             chattype: 'user',
             content: content
