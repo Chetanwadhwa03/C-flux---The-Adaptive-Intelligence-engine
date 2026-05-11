@@ -4,9 +4,10 @@ import streamifier from 'streamifier'
 
 dotenv.config()
 
+
 // @ts-ignore
 cloudinary.config({
-    cloud_name:process.env.CLOUDNINARY_CLOUD_NAME,
+    cloud_name:process.env.CLOUDINARY_CLOUD_NAME,
     api_key:process.env.CLOUDINARY_API_KEY,
     api_secret:process.env.CLOUDINARY_API_SECRET
 })
@@ -14,6 +15,15 @@ cloudinary.config({
 const uploadbuffertocloudinary = (file: Buffer) : Promise<string>=>{
     return new Promise((resolve,reject)=>{
         const uploadstream = cloudinary.uploader.upload_stream(
+
+            // mentioned resource-type because cloudinary by default consider all the files being uploaded as image 
+            // like jpg / png
+        
+            {
+                resource_type:'raw',
+                folder:'c-flux-dev'
+            },
+
             (error,result) =>{
                 if(error){
                     return reject(error)

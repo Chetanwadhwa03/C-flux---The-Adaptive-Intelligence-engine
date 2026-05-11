@@ -1,0 +1,1 @@
+{"root":["./src/worker.ts","./src/server.ts","./src/middleware/auth.ts","./src/middleware/multer.ts","./src/models/chat.ts","./src/models/knowledgebase.ts","./src/models/message.ts","./src/models/user.ts","./src/utils/chunker.ts","./src/config/cloudinary.ts","./src/config/redisclient.ts"],"version":"6.0.3"}

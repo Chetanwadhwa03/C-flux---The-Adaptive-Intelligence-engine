@@ -18,4 +18,5 @@ const upload  = multer({
     }
 })
 
+console.log('We have created the upload using the multer middleware');
 export default upload;
