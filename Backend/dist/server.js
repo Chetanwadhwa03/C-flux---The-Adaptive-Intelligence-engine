@@ -12,7 +12,8 @@ import Auth from './Middleware/Auth.js';
 import Chatmodel from './Models/Chat.js';
 import Messagemodel from './Models/Message.js';
 import Redisclient from './config/Redisclient.js';
-mongoose.connect('mongodb+srv://lovewadhwa03_db_user:password12345@todoapp.zhg1uey.mongodb.net/c-flux');
+// @ts-ignore
+mongoose.connect(process.env.MONGODB_URI);
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
