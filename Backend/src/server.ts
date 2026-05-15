@@ -251,8 +251,12 @@ app.post('/api/v1/post-chat/:chatid/messages', async (req, res) => {
             content: content
         }
 
-        // @ts-ignore
-        await Messagemodel.create(messagegot)
+        // // @ts-ignore
+        // await Messagemodel.create({
+        //     chatid:chatid,
+        //     chattype:'user',
+        //     content:content
+        // })
 
         await Redisclient.lPush('AI_handling_messages', JSON.stringify(messagegot));
         console.log('Message pushed to the redis queue');

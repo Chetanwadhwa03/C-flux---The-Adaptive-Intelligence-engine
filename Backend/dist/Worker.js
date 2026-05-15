@@ -16,6 +16,7 @@ const delay = (ms) => {
 const processwork = async (work) => {
     const parsedwork = JSON.parse(work);
     const { type, chatid } = parsedwork;
+    const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     if (type === 'ingestion') {
         const { link, mimetype } = parsedwork;
         // 1. Fetching the file from the cloudinary link.
@@ -40,8 +41,6 @@ const processwork = async (work) => {
         const chunks = chunker(content, 1000, 200);
         // 4. Getting the embedding vectors for the chunks.
         // a) Creating the instance corresponding to the class 
-        // @ts-ignore
-        const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         //b) to convert the chunks in to the embeddings
         let pineconedata = [];
         for (let i = 0; i < chunks.length; i++) {
@@ -80,8 +79,65 @@ const processwork = async (work) => {
             }
         }
     }
-    // else if (type === 'messageprocess'){
-    // }
+    else if (type === 'messageprocess') {
+        try {
+            const { content } = parsedwork;
+            // 1. Converting the content in to the embeddings
+            console.log('Embedding the prompt given by the user');
+            const response = await genai.models.embedContent({
+                model: "gemini-embedding-001",
+                contents: content
+            });
+            // vectorarray is just the embedding for the user prompt.
+            const vectorarray = response.embeddings?.[0]?.values;
+            console.log(`Prompt has been embedded successfully`);
+            // 2. checking the cosine similarity with the data present in the pinecone
+            let result;
+            let contextstring = "";
+            if (vectorarray) {
+                result = await index.query({
+                    vector: vectorarray,
+                    topK: 3,
+                    includeMetadata: true
+                });
+                for (let i = 0; i < result.matches.length; i++) {
+                    contextstring = contextstring + result.matches[i]?.metadata?.text + "\n\n";
+                }
+            }
+            // 3. Generating the System prompt (Persona , guardrails/limitations of AI, context , user prompt)
+            const systemprompt = `
+            You are an intelligent document assistant for the C-Flux platform.
+
+            CRITICAL INSTRUCTIONS:
+            You are about to take an open-book exam. I am going to provide you with context extracted from a user's uploaded document. 
+            You must answer the user's question using ONLY the provided context. 
+
+            If the answer cannot be found in the context below, you must strictly reply with: "I do not have enough information in the document to answer that." 
+            Under no circumstances should you guess, hallucinate, or use your general training data to answer.
+
+            CONTEXT FROM DOCUMENT:
+            ----------------------
+            ${contextstring}
+            ----------------------
+
+            USER QUESTION:
+            ${content}
+            `;
+            // 4. Time to send this system prompt to the LLM API and to get the response back
+            const responsestream = await genai.models.generateContentStream({
+                model: 'gemini-2.5-flash',
+                contents: systemprompt
+            });
+            for await (const chunks of responsestream) {
+                if (chunks.text) {
+                    process.stdout.write(chunks.text);
+                }
+            }
+        }
+        catch (e) {
+            console.log('Error encountered in messageprocessing in the worker as ', e);
+        }
+    }
 };
 const connectworker = async () => {
     try {
@@ -90,6 +146,7 @@ const connectworker = async () => {
         while (1) {
             try {
                 const work = await Redisclient.brPop('AI_handling_messages', 0);
+                console.log(`The work has been fetched from the queue in the worker`);
                 if (work) {
                     await processwork(work.element);
                     console.log('The work has been fetched and completed in the worker !');
