@@ -15,6 +15,5 @@ const upload = multer({
         fileSize: 5 * 1024 * 1024
     }
 });
-console.log('We have created the upload using the multer middleware');
 export default upload;
 //# sourceMappingURL=Multer.js.map

@@ -110,6 +110,7 @@ const processwork = async (work: string) => {
     else if (type === 'messageprocess') {
         try {
             const { content } = parsedwork
+            const {chatid} = parsedwork
 
             // 1. Converting the content in to the embeddings
             console.log('Embedding the prompt given by the user')
@@ -164,11 +165,23 @@ const processwork = async (work: string) => {
                 contents:systemprompt
             })
 
+            
             for await (const chunks of responsestream) {
+                    console.log('Sending the chunks over the stream of the pub/subs');
                     if(chunks.text){
-                        process.stdout.write(chunks.text);
+                        const obj = {
+                            type:'chunks',
+                            content:chunks.text,
+                            chatid:chatid
+                        }
+                        Redisclient.PUBLISH('AIstreamingmessages', JSON.stringify(obj));
                     }
             }
+            const obj = {
+                type:'end',
+                chatid:chatid
+            }
+            Redisclient.PUBLISH('AIstreamingmessages' , JSON.stringify(obj));
         }
         catch (e) {
             console.log('Error encountered in messageprocessing in the worker as ', e);
@@ -185,7 +198,7 @@ const connectworker = async () => {
     try {
         await Redisclient.connect();
         console.log('Redis client in the worker connected !');
-
+        
         while (1) {
             try {
                 const work = await Redisclient.brPop('AI_handling_messages', 0);

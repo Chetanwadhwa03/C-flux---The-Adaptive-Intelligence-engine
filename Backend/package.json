@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsc -b && node dist/server.js",
-    "worker": "tsc -b && node dist/Worker.js"
+    "worker": "tsc -b && node dist/Worker.js",
+    "websockets":"tsc -b && node dist/Websocketserver.js"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/redis": "^4.0.10",
     "@types/streamifier": "^0.1.2",
+    "@types/ws": "^8.18.1",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.10.0",
     "dotenv": "^17.4.2",
@@ -35,6 +37,7 @@
     "streamifier": "^0.1.1",
     "streamify": "^1.0.0",
     "typescript": "^6.0.3",
+    "ws": "^8.20.1",
     "zod": "^4.4.1"
   }
 }

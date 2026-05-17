@@ -82,6 +82,7 @@ const processwork = async (work) => {
     else if (type === 'messageprocess') {
         try {
             const { content } = parsedwork;
+            const { chatid } = parsedwork;
             // 1. Converting the content in to the embeddings
             console.log('Embedding the prompt given by the user');
             const response = await genai.models.embedContent({
@@ -129,10 +130,21 @@ const processwork = async (work) => {
                 contents: systemprompt
             });
             for await (const chunks of responsestream) {
+                console.log('Sending the chunks over the stream of the pub/subs');
                 if (chunks.text) {
-                    process.stdout.write(chunks.text);
+                    const obj = {
+                        type: 'chunks',
+                        content: chunks.text,
+                        chatid: chatid
+                    };
+                    Redisclient.PUBLISH('AIstreamingmessages', JSON.stringify(obj));
                 }
             }
+            const obj = {
+                type: 'end',
+                chatid: chatid
+            };
+            Redisclient.PUBLISH('AIstreamingmessages', JSON.stringify(obj));
         }
         catch (e) {
             console.log('Error encountered in messageprocessing in the worker as ', e);

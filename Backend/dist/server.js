@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import upload from './Middleware/Multer.js';
 import uploadbuffertocloudinary from './config/Cloudinary.js';
+import websocketconnection from './Websocketserver.js';
 import Auth from './Middleware/Auth.js';
 import Chatmodel from './Models/Chat.js';
 import Messagemodel from './Models/Message.js';
@@ -250,6 +251,7 @@ app.post('/api/v1/:chatid/upload-files', Auth, upload.single('document'), async 
         console.log('Error encountered while uploading the file as : ', e);
     }
 });
+// for the HTTP server and the Redis client connection.
 const connect = async () => {
     try {
         await Redisclient.connect();
@@ -257,6 +259,7 @@ const connect = async () => {
         server.listen(PORT, () => {
             console.log(`Server is listening on the ${PORT}`);
         });
+        websocketconnection(server);
     }
     catch (e) {
         console.log('Error during connection either to redis or server as ', e);
